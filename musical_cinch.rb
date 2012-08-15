@@ -1,15 +1,19 @@
 #!/usr/bin/env ruby
+# encoding: utf-8
+
 require "optparse"
 require "cinch"
 require "librmpd"
 
 module MusicalCinch
-  class TimedPlugin
+  class MpdPlugin
     include Cinch::Plugin
 
-    timer 1, method: :timed
+    timer 1, method: :update_status
 
-    def timed
+    attr_reader :current_song, :state
+
+    def update_status
       new_state = bot.config.mpd_client.status["state"]
       new_current_song = bot.config.mpd_client.current_song
 
@@ -34,18 +38,27 @@ module MusicalCinch
         c.channels = options[:channels]
         c.nick = options[:nick]
         c.verbose = options[:verbose]
-        c.plugins.plugins = [TimedPlugin]
+        c.plugins.plugins = [MpdPlugin]
 
         c.mpd_client = MPD.new(options[:mpd_host], options[:mpd_port])
         c.mpd_client.connect
       end
 
       on :join do |m|
-        m.channel.msg "Sup guys"
+        m.channel.msg "Sup"
       end
 
-      on :message, "hola capo" do |m|
+      on :message, /hola capo/i do |m|
         m.reply "viva peron #{m.user.nick}"
+      end
+
+      on :message, /que suena/i do |m|
+        current_song = m.bot.plugins.find { |p| p.is_a?(MpdPlugin) }.current_song
+        if current_song
+          m.reply "#{m.user.nick}, suena #{current_song["artist"]} ~ #{current_song["title"]}"
+        else
+          m.reply "No está sonando nada #{m.user.nick} capo, no escuchás?"
+        end
       end
     end
 
